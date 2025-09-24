@@ -29,7 +29,7 @@ jobs:
 
       - name: Build (skip TS typecheck for this test)
         env:
-          VITE_API_URL: https://codelang.vercel.app/api
+          VITE_API_URL: https://stack1-proxy.vercel.app/api
           VITE_WS_ENABLED: "false"
           VITE_WS_NAMESPACE: /ws
         run: npx vite build
