@@ -94,17 +94,6 @@ export const fetchSnippetById = async (
   return mapApiSnippetToDomainSnippet(apiResp);
 };
 
-export const fetchSnippetLanguages = async (
-  signal?: AbortSignal
-): Promise<string[]> => {
-  const { data: raw } = await api.get(`/snippets/languages`, { signal });
-  const data = unwrap<string[]>(raw);
-  if (Array.isArray(data) && data.every((item) => typeof item === "string")) {
-    return data;
-  }
-  throw new Error("Unexpected API response shape for /snippets/languages");
-};
-
 //Private (with cookies)
 
 export const createSnippet = async (
@@ -135,4 +124,19 @@ export const deleteSnippet = async (
 ): Promise<ApiSnippet> => {
   const { data: raw } = await apiAuth.delete(`/snippets/${snippetId}`);
   return unwrap<ApiSnippet>(raw);
+};
+
+export const fetchSnippetLanguages = async (
+  signal?: AbortSignal
+): Promise<string[]> => {
+  const { data: raw } = await apiAuth.get(`/snippets/languages`, {
+    signal,
+    validateStatus: (s) => s >= 200 && s < 300,
+  });
+
+  const data = unwrap<string[]>(raw);
+  if (Array.isArray(data) && data.every((item) => typeof item === "string")) {
+    return data;
+  }
+  throw new Error("Unexpected API response shape for /snippets/languages");
 };
