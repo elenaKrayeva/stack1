@@ -32,85 +32,57 @@ export const unwrap = <T>(rawJsonOrEnvelope: T | ApiEnvelope<T>): T => {
     : (rawJsonOrEnvelope as T);
 };
 
-export const getMe = async (abortSignal?: AbortSignal): Promise<MeResponse> => {
-  const httpResponse = await fetch("/api/me", {
-    method: "GET",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    signal: abortSignal,
-  });
-  if (!httpResponse.ok)
-    throw new Error(`GET /api/me failed: ${httpResponse.status}`);
-  const rawJsonResponse = await httpResponse.json();
-  return unwrap<MeResponse>(rawJsonResponse);
+import { apiAuth } from "@/shared/api/axios";
+
+
+export const getMe = async (signal?: AbortSignal): Promise<MeResponse> => {
+  const { data: raw } = await apiAuth.get<ApiEnvelope<MeResponse> | MeResponse>(`/me`, { signal });
+  return unwrap<MeResponse>(raw);
 };
+
 
 export const getUserStatistic = async (
   userId: string | number,
-  abortSignal?: AbortSignal
+  signal?: AbortSignal
 ): Promise<UserStatistic> => {
-  const httpResponse = await fetch(`/api/users/${userId}/statistic`, {
-    method: "GET",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    signal: abortSignal,
-  });
-  if (!httpResponse.ok)
-    throw new Error(
-      `GET /api/users/${userId}/statistic failed: ${httpResponse.status}`
-    );
-  const rawJsonResponse = await httpResponse.json();
-  return unwrap<UserStatistic>(rawJsonResponse);
+  const { data: raw } = await apiAuth.get<ApiEnvelope<UserStatistic> | UserStatistic>(
+    `/users/${userId}/statistic`,
+    { signal }
+  );
+  return unwrap<UserStatistic>(raw);
 };
+
 
 export const deleteMyAccount = async (
-  abortSignal?: AbortSignal
+  signal?: AbortSignal
 ): Promise<MeResponse | undefined> => {
-  const httpResponse = await fetch("/api/me", {
-    method: "DELETE",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    signal: abortSignal,
+  const res = await apiAuth.delete(`/me`, {
+    signal,
+    validateStatus: (s) => (s >= 200 && s < 300) || s === 204,
   });
 
-  if (!httpResponse.ok) {
-    throw new Error(`DELETE /api/me failed: ${httpResponse.status}`);
-  }
+  if (res.status === 204) return undefined;
 
-  if (httpResponse.status === 204) return undefined;
-
-  const rawJsonResponse = await httpResponse.json().catch(() => undefined);
-  return rawJsonResponse ? unwrap<MeResponse>(rawJsonResponse) : undefined;
+  return unwrap<MeResponse>(res.data as ApiEnvelope<MeResponse> | MeResponse);
 };
+
 
 export const updateMyUsername = async (
   payload: { username: string },
-  abortSignal?: AbortSignal
+  signal?: AbortSignal
 ): Promise<MeResponse> => {
-  const httpResponse = await fetch("/api/me", {
-    method: "PATCH",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-    signal: abortSignal,
-  });
-  if (!httpResponse.ok)
-    throw new Error(`PATCH /api/me failed: ${httpResponse.status}`);
-  const rawJsonResponse = await httpResponse.json();
-  return unwrap<MeResponse>(rawJsonResponse);
+  const { data: raw } = await apiAuth.patch<ApiEnvelope<MeResponse> | MeResponse>(
+    `/me`,
+    payload,
+    { signal }
+  );
+  return unwrap<MeResponse>(raw);
 };
+
 
 export const updateMyPassword = async (
   payload: { oldPassword: string; newPassword: string },
-  abortSignal?: AbortSignal
+  signal?: AbortSignal
 ): Promise<void> => {
-  const httpResponse = await fetch("/api/me/password", {
-    method: "PATCH",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-    signal: abortSignal,
-  });
-  if (!httpResponse.ok)
-    throw new Error(`PATCH /api/me/password failed: ${httpResponse.status}`);
+  await apiAuth.patch(`/me/password`, payload, { signal });
 };
