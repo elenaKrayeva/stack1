@@ -12,8 +12,9 @@ import type {
   UpdateSnippetDto,
   UpdateSnippetResponse,
 } from "./types";
+import { API_BASE_URL } from "@/shared/api/config";
 
-const API_BASE_URL = "/api";
+
 
 const unwrapSnippetsApiResponse = (raw: unknown): ApiSnippetsResponse => {
   const envelope = raw as { data: ApiSnippetsResponse };
