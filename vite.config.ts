@@ -15,6 +15,7 @@ type ProxyLike = {
 export default defineConfig({
   plugins: [react(), tailwindcss(), mkcert()],
   resolve: { alias: { '@': '/src' } },
+  base: '/stack1/',
   server: {
     https: {}, 
     proxy: {
