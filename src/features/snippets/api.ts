@@ -64,7 +64,7 @@ export const fetchSnippets = async (
     sortBy.forEach((sortField) => url.searchParams.append("sortBy", sortField));
   }
 
-  const res = await fetch(url.toString(), { credentials: "include", signal });
+  const res = await fetch(url.toString(), { credentials: import.meta.env.DEV ? "include" : "omit", signal });
   if (!res.ok)
     throw new Error(`Failed to load snippets (status ${res.status})`);
 
