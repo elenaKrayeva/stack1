@@ -97,7 +97,7 @@ export const fetchSnippetById = async (
     `${API_BASE_URL}/snippets/${snippetId}`,
     window.location.origin
   );
-  const res = await fetch(url.toString(), { credentials: "include" });
+  const res = await fetch(url.toString(), { credentials: import.meta.env.DEV ? "include" : "omit", });
   if (!res.ok)
     throw new Error(
       `Failed to load snippet ${snippetId} (status ${res.status})`
@@ -157,7 +157,7 @@ export const fetchSnippetLanguages = async (
 ): Promise<string[]> => {
   const res = await fetch(`/api/snippets/languages`, {
     method: "GET",
-    credentials: "include",
+    credentials: import.meta.env.DEV ? "include" : "omit",
     headers: { "Content-Type": "application/json" },
     signal,
   });
