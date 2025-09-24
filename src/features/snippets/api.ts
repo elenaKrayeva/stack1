@@ -12,9 +12,7 @@ import type {
   UpdateSnippetDto,
   UpdateSnippetResponse,
 } from "./types";
-import { API_BASE_URL } from "@/shared/api/config";
-
-
+import { api, apiAuth } from "@/shared/api/axios";
 
 const unwrapSnippetsApiResponse = (raw: unknown): ApiSnippetsResponse => {
   const envelope = raw as { data: ApiSnippetsResponse };
@@ -45,6 +43,8 @@ const unwrapSingleSnippetApiResponse = (raw: unknown): ApiSnippet => {
   throw new Error("Unexpected API response shape for /snippets/{id}");
 };
 
+//Public (no cookies)
+
 type FetchSnippetsParameters = {
   page?: number;
   limit?: number;
@@ -56,29 +56,24 @@ export const fetchSnippets = async (
   { page = 1, limit, userId, sortBy }: FetchSnippetsParameters = {},
   signal?: AbortSignal
 ): Promise<SnippetsPage> => {
-  const url = new URL(`${API_BASE_URL}/snippets`, window.location.origin);
-  url.searchParams.set("page", String(page));
-  if (limit != null) url.searchParams.set("limit", String(limit));
-  if (userId != null) url.searchParams.set("userId", String(userId));
-  if (Array.isArray(sortBy)) {
-    sortBy.forEach((sortField) => url.searchParams.append("sortBy", sortField));
-  }
+  const q = new URLSearchParams();
+  q.set("page", String(page));
+  if (limit != null) q.set("limit", String(limit));
+  if (userId != null) q.set("userId", String(userId));
+  if (Array.isArray(sortBy)) sortBy.forEach((s) => q.append("sortBy", s));
 
-  const res = await fetch(url.toString(), { credentials: import.meta.env.DEV ? "include" : "omit", signal });
-  if (!res.ok)
-    throw new Error(`Failed to load snippets (status ${res.status})`);
+  const { data: raw } = await api.get(`/snippets?${q.toString()}`, { signal });
+  const apiResp = unwrapSnippetsApiResponse(raw);
 
-  const raw = await res.json();
-  const api = unwrapSnippetsApiResponse(raw);
-
-  const items = api.data.map(mapApiSnippetToDomainSnippet);
+  const items = apiResp.data.map(mapApiSnippetToDomainSnippet);
   const {
     itemsPerPage: pageSize,
     currentPage,
     totalItems,
     totalPages,
-  } = api.meta;
-  const hasMore = Boolean(api.links.next) || currentPage < totalPages;
+  } = apiResp.meta;
+
+  const hasMore = Boolean(apiResp.links.next) || currentPage < totalPages;
 
   return {
     items,
@@ -91,41 +86,31 @@ export const fetchSnippets = async (
 };
 
 export const fetchSnippetById = async (
-  snippetId: number | string
+  snippetId: number | string,
+  signal?: AbortSignal
 ): Promise<Snippet> => {
-  const url = new URL(
-    `${API_BASE_URL}/snippets/${snippetId}`,
-    window.location.origin
-  );
-  const res = await fetch(url.toString(), { credentials: import.meta.env.DEV ? "include" : "omit", });
-  if (!res.ok)
-    throw new Error(
-      `Failed to load snippet ${snippetId} (status ${res.status})`
-    );
-
-  const raw = await res.json();
-  const api = unwrapSingleSnippetApiResponse(raw);
-  return mapApiSnippetToDomainSnippet(api);
+  const { data: raw } = await api.get(`/snippets/${snippetId}`, { signal });
+  const apiResp = unwrapSingleSnippetApiResponse(raw);
+  return mapApiSnippetToDomainSnippet(apiResp);
 };
+
+export const fetchSnippetLanguages = async (
+  signal?: AbortSignal
+): Promise<string[]> => {
+  const { data: raw } = await api.get(`/snippets/languages`, { signal });
+  const data = unwrap<string[]>(raw);
+  if (Array.isArray(data) && data.every((item) => typeof item === "string")) {
+    return data;
+  }
+  throw new Error("Unexpected API response shape for /snippets/languages");
+};
+
+//Private (with cookies)
 
 export const createSnippet = async (
   payload: CreateSnippetDto
 ): Promise<ApiSnippet> => {
-  const res = await fetch(`${API_BASE_URL}/snippets`, {
-    method: "POST",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(
-      `Failed to create snippet (status ${res.status})${
-        text ? `: ${text}` : ""
-      }`
-    );
-  }
-  const raw = await res.json();
+  const { data: raw } = await apiAuth.post(`/snippets`, payload);
   return unwrap<ApiSnippet>(raw);
 };
 
@@ -133,87 +118,21 @@ export const markSnippet = async (
   snippetId: number | string,
   mark: MarkKind
 ): Promise<unknown> => {
-  const res = await fetch(`/api/snippets/${snippetId}/mark`, {
-    method: "POST",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ mark }),
-  });
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(
-      `Failed to mark snippet (status ${res.status})${text ? `: ${text}` : ""}`
-    );
-  }
-  try {
-    return await res.json();
-  } catch {
-    return { ok: true };
-  }
-};
-
-export const fetchSnippetLanguages = async (
-  signal?: AbortSignal
-): Promise<string[]> => {
-  const res = await fetch(`/api/snippets/languages`, {
-    method: "GET",
-    credentials: import.meta.env.DEV ? "include" : "omit",
-    headers: { "Content-Type": "application/json" },
-    signal,
-  });
-  if (!res.ok) {
-    throw new Error(`Failed to load languages (status ${res.status})`);
-  }
-  const raw = await res.json();
-  const data = unwrap<string[]>(raw);
-
-  if (Array.isArray(data) && data.every((item) => typeof item === "string")) {
-    return data;
-  }
-  throw new Error("Unexpected API response shape for /snippets/languages");
+  const { data } = await apiAuth.post(`/snippets/${snippetId}/mark`, { mark });
+  return data ?? { ok: true };
 };
 
 export const updateSnippet = async (
   snippetId: number | string,
   payload: UpdateSnippetDto
 ): Promise<UpdateSnippetResponse> => {
-  const res = await fetch(`${API_BASE_URL}/snippets/${snippetId}`, {
-    method: "PATCH",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(
-      `Failed to update snippet ${snippetId} (status ${res.status})${
-        text ? `: ${text}` : ""
-      }`
-    );
-  }
-
-  const raw = await res.json();
+  const { data: raw } = await apiAuth.patch(`/snippets/${snippetId}`, payload);
   return unwrap<UpdateSnippetResponse>(raw);
 };
 
 export const deleteSnippet = async (
   snippetId: number | string
 ): Promise<ApiSnippet> => {
-  const res = await fetch(`${API_BASE_URL}/snippets/${snippetId}`, {
-    method: "DELETE",
-    credentials: "include",
-  });
-
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(
-      `Failed to delete snippet ${snippetId} (status ${res.status})${
-        text ? `: ${text}` : ""
-      }`
-    );
-  }
-
-  const raw = await res.json();
+  const { data: raw } = await apiAuth.delete(`/snippets/${snippetId}`);
   return unwrap<ApiSnippet>(raw);
 };
