@@ -14,8 +14,9 @@ import {
   mapApiAnswerToDomainAnswer,
 } from "./mappers";
 import { unwrap } from "@/shared/api/unwrap";
+import { API_BASE_URL } from "@/shared/api/config";
 
-const API_BASE_URL = "/api";
+
 
 export type FetchQuestionsParameters = {
   page?: number;
